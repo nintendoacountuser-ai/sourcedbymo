@@ -9,7 +9,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const router = useRouter();
 
-  const MASTER_KEY = "MO-SUPPLY-2026";
+  const MASTER_KEY = "ksta";
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
