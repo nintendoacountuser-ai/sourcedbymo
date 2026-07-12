@@ -2,10 +2,15 @@
 module.exports = {
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/**/*.{js,ts,jsx,tsx,mdx}", // Adds support if files are inside a src folder
+    "./src/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {
+      colors: {
+        // 💜 Flipped signature branding variables over to premium neon purple profiles
+        brand: '#a855f7',
+        brandDark: '#120f1a',
+      },
       animation: {
         fadeIn: 'fadeIn 0.6s ease-out forwards',
         scaleUp: 'scaleUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards',
