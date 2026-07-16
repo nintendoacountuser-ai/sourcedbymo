@@ -15,6 +15,7 @@ interface ProductData {
   status?: string;
   sizes?: string[];
   size_prices?: Record<string, string | number>;
+  size_stock?: Record<string, number>; // 💜 Added size stock type mapping
   description?: string;
 }
 
@@ -30,6 +31,14 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
   const [quantity, setQuantity] = useState<number>(1);
   const [checkoutLoading, setCheckoutLoading] = useState<boolean>(false);
 
+  // Helper: Fetch remaining stock for a size safely
+  const getStockForSize = (p: ProductData, size: string): number => {
+    if (p.size_stock && p.size_stock[size] !== undefined) {
+      return Number(p.size_stock[size]);
+    }
+    return 0; // Default to 0 if not defined in Supabase yet
+  };
+
   useEffect(() => {
     async function fetchProduct() {
       const { data, error } = await supabase
@@ -39,9 +48,15 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
         .single();
 
       if (!error && data) {
-        setProduct(data as ProductData);
-        if (data.sizes && data.sizes.length > 0) {
-          setSelectedSize(data.sizes[0]);
+        const fetchedProduct = data as ProductData;
+        setProduct(fetchedProduct);
+
+        if (fetchedProduct.sizes && fetchedProduct.sizes.length > 0) {
+          // 💜 UX Fix: Automatically select the first size that has stock available
+          const firstInStockSize = fetchedProduct.sizes.find(
+            (size) => getStockForSize(fetchedProduct, size) > 0
+          );
+          setSelectedSize(firstInStockSize || fetchedProduct.sizes[0]);
         }
       }
       setLoading(false);
@@ -67,6 +82,9 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
     );
   }
 
+  // Helper mapping helper exposed to outer component render context
+  const currentStockForSize = selectedSize ? getStockForSize(product, selectedSize) : 0;
+
   const getPriceForSize = (size: string): number => {
     if (product.size_prices && product.size_prices[size]) {
       return Number(product.size_prices[size]);
@@ -77,7 +95,22 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
   const currentUnitPrice = getPriceForSize(selectedSize);
   const totalPrice = currentUnitPrice * quantity;
 
+  // 💜 Check current selected item stock status
+  const isOutOfStock = currentStockForSize <= 0;
+
+  // 💜 Safe Size Selection: Resets quantity logic to max available stock bounds
+  const handleSizeChange = (size: string) => {
+    setSelectedSize(size);
+    const newSizeStock = getStockForSize(product, size);
+    if (newSizeStock > 0) {
+      setQuantity(1); // Reset purchase count to 1 safely
+    } else {
+      setQuantity(0);
+    }
+  };
+
   const handleCheckout = async () => {
+    if (isOutOfStock) return;
     setCheckoutLoading(true);
     try {
       const response = await fetch("/api/checkout", {
@@ -147,20 +180,32 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
               <div className="mt-6">
                 <label className="text-[10px] font-bold tracking-wider text-purple-400/80 uppercase block mb-2">Select Size</label>
                 <div className="flex flex-wrap gap-2">
-                  {product.sizes.map((size: string) => (
-                    <button
-                      key={size}
-                      type="button"
-                      onClick={() => setSelectedSize(size)}
-                      className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all ${
-                        selectedSize === size
-                          ? "bg-purple-600 text-white border-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.3)]"
-                          : "bg-neutral-950 text-gray-400 border-neutral-900 hover:text-white hover:border-purple-950"
-                      }`}
-                    >
-                      {size} {product.size_prices && product.size_prices[size] && `(£${product.size_prices[size]})`}
-                    </button>
-                  ))}
+                  {product.sizes.map((size: string) => {
+                    const stock = getStockForSize(product, size);
+                    const outOfStock = stock <= 0;
+
+                    return (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => handleSizeChange(size)}
+                        className={`px-4 py-2.5 text-xs font-bold rounded-xl border transition-all flex flex-col items-center justify-center min-w-[70px] cursor-pointer ${
+                          outOfStock
+                            ? "bg-neutral-950/30 border-neutral-950 text-neutral-600 cursor-not-allowed opacity-50"
+                            : selectedSize === size
+                              ? "bg-purple-600 text-white border-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.3)]"
+                              : "bg-neutral-950 text-gray-400 border-neutral-900 hover:text-white hover:border-purple-950"
+                        }`}
+                      >
+                        <span>{size} {product.size_prices && product.size_prices[size] && `(£${product.size_prices[size]})`}</span>
+                        <span className={`text-[8px] font-semibold mt-0.5 uppercase tracking-wide ${
+                          outOfStock ? "text-red-500" : "text-purple-400/70"
+                        }`}>
+                          {outOfStock ? "Out of Stock" : `${stock} left`}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -168,9 +213,25 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
             <div className="mt-6">
               <label className="text-[10px] font-bold tracking-wider text-purple-400/80 uppercase block mb-2">Quantity</label>
               <div className="flex items-center gap-3 bg-neutral-950 border border-neutral-900 w-max p-1 rounded-xl">
-                <button type="button" onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-8 h-8 flex items-center justify-center font-bold text-gray-400 hover:text-white">-</button>
-                <span className="w-8 text-center text-xs font-mono font-bold text-gray-200">{quantity}</span>
-                <button type="button" onClick={() => setQuantity(quantity + 1)} className="w-8 h-8 flex items-center justify-center font-bold text-gray-400 hover:text-white">+</button>
+                <button
+                  type="button"
+                  disabled={isOutOfStock || quantity <= 1}
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  className="w-8 h-8 flex items-center justify-center font-bold text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  -
+                </button>
+                <span className={`w-8 text-center text-xs font-mono font-bold ${isOutOfStock ? "text-gray-600" : "text-gray-200"}`}>
+                  {isOutOfStock ? 0 : quantity}
+                </span>
+                <button
+                  type="button"
+                  disabled={isOutOfStock || quantity >= currentStockForSize}
+                  onClick={() => setQuantity(quantity + 1)}
+                  className="w-8 h-8 flex items-center justify-center font-bold text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  +
+                </button>
               </div>
             </div>
           </div>
@@ -178,16 +239,26 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
           <div className="mt-8 pt-6 border-t border-purple-950/20">
             <div className="flex items-baseline justify-between mb-4">
               <span className="text-xs text-neutral-500 font-medium">Total Price:</span>
-              <span className="text-2xl font-black text-purple-400">£{totalPrice}</span>
+              <span className="text-2xl font-black text-purple-400">
+                {isOutOfStock ? "£0" : `£${totalPrice}`}
+              </span>
             </div>
 
-            {/* 💜 Fixed: Converted to Tailwind v4 class 'bg-linear-to-r' */}
+            {/* 💜 Fixed: Converted to Tailwind v4 class 'bg-linear-to-r' & supports active stock checking */}
             <button
               onClick={handleCheckout}
-              disabled={checkoutLoading}
-              className="w-full py-4 bg-linear-to-r from-purple-600 to-purple-400 font-extrabold text-xs tracking-wider uppercase rounded-xl text-white shadow-[0_0_20px_rgba(168,85,247,0.2)] hover:brightness-110 active:scale-[0.99] transition-all disabled:opacity-50"
+              disabled={checkoutLoading || isOutOfStock}
+              className={`w-full py-4 font-extrabold text-xs tracking-wider uppercase rounded-xl text-white transition-all cursor-pointer ${
+                isOutOfStock
+                  ? "bg-neutral-950 text-neutral-600 border border-neutral-900 cursor-not-allowed opacity-50"
+                  : "bg-linear-to-r from-purple-600 to-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.2)] hover:brightness-110 active:scale-[0.99] disabled:opacity-50"
+              }`}
             >
-              {checkoutLoading ? "Acquiring Secure Session..." : "Secure Order Line"}
+              {checkoutLoading
+                ? "Acquiring Secure Session..."
+                : isOutOfStock
+                  ? "Selected Size Out of Stock"
+                  : "Secure Order Line"}
             </button>
           </div>
         </div>

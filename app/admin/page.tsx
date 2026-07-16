@@ -4,11 +4,24 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabase";
 
+interface DBProduct {
+  id: string;
+  name: string;
+  price: number;
+  image: string;
+  category: string;
+  status: string;
+  sizes: string[];
+  size_prices: Record<string, number>;
+  size_stock: Record<string, number>;
+  description: string;
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [dbProducts, setDbProducts] = useState<any[]>([]);
+  const [dbProducts, setDbProducts] = useState<DBProduct[]>([]);
 
   // 🔄 Editing State Logic
   const [isEditing, setIsEditing] = useState(false);
@@ -22,6 +35,7 @@ export default function AdminDashboard() {
   const [status, setStatus] = useState("In Stock");
   const [sizesInput, setSizesInput] = useState("");
   const [sizePricesInput, setSizePricesInput] = useState("");
+  const [sizeStockInput, setSizeStockInput] = useState(""); // 💜 State to manage stock values via textbox
   const [description, setDescription] = useState("");
 
   // Guard page and fetch active stock
@@ -37,12 +51,12 @@ export default function AdminDashboard() {
   async function fetchCurrentInventory() {
     const { data, error } = await supabase.from("products").select("*");
     if (!error && data) {
-      setDbProducts(data);
+      setDbProducts(data as DBProduct[]);
     }
   }
 
   // 📝 Trigger Edit Mode (Populates form with selected item details)
-  const handleEditTrigger = (product: any) => {
+  const handleEditTrigger = (product: DBProduct) => {
     setIsEditing(true);
     setId(product.id || "");
     setName(product.name || "");
@@ -53,12 +67,20 @@ export default function AdminDashboard() {
     setDescription(product.description || "");
     setSizesInput(product.sizes ? product.sizes.join(", ") : "");
 
-    // 🧠 Convert JSON database object back to editable text layout safely
+    // 🧠 Convert JSON price map back to editable text layout safely
     if (product.size_prices && Object.keys(product.size_prices).length > 0) {
-      const pairs = Object.entries(product.size_prices).map(([sz, pr]) => `${sz}:${pr}`);
-      setSizePricesInput(pairs.join(", "));
+      const pricePairs = Object.entries(product.size_prices).map(([sz, pr]) => `${sz}:${pr}`);
+      setSizePricesInput(pricePairs.join(", "));
     } else {
       setSizePricesInput("");
+    }
+
+    // 🧠 Convert JSON stock map back to editable text layout safely
+    if (product.size_stock && Object.keys(product.size_stock).length > 0) {
+      const stockPairs = Object.entries(product.size_stock).map(([sz, st]) => `${sz}:${st}`);
+      setSizeStockInput(stockPairs.join(", "));
+    } else {
+      setSizeStockInput("");
     }
 
     // Smoothly scroll straight back to the top form layout
@@ -76,6 +98,7 @@ export default function AdminDashboard() {
     setStatus("In Stock");
     setSizesInput("");
     setSizePricesInput("");
+    setSizeStockInput(""); // 💜 Reset stock text state
     setDescription("");
   };
 
@@ -97,6 +120,22 @@ export default function AdminDashboard() {
       });
     }
 
+    // 🧠 Parse the "UK 8:10, UK 9:5" text safely into a structured JSON Map object
+    const sizeStockMap: Record<string, number> = {};
+    if (sizeStockInput) {
+      sizeStockInput.split(",").forEach(pair => {
+        const [sizeKey, stockVal] = pair.split(":");
+        if (sizeKey && stockVal) {
+          sizeStockMap[sizeKey.trim()] = Math.max(0, parseInt(stockVal.trim()) || 0);
+        }
+      });
+    } else {
+      // Default placeholder stock fallback mapping to 10 units for any size defined but unlisted in stocks input
+      sizesArray.forEach(size => {
+        sizeStockMap[size] = 10;
+      });
+    }
+
     const payload = {
       name,
       price: price ? Number(price) : 0,
@@ -105,6 +144,7 @@ export default function AdminDashboard() {
       status,
       sizes: sizesArray,
       size_prices: sizePricesMap,
+      size_stock: sizeStockMap, // 💜 Added database payload record
       description
     };
 
@@ -246,7 +286,7 @@ export default function AdminDashboard() {
             <input type="text" value={sizesInput || ""} onChange={(e) => setSizesInput(e.target.value)} placeholder="UK 8, UK 9, UK 10" className="w-full bg-neutral-950 border border-neutral-850 focus:border-purple-500 p-3 rounded-xl mt-1 text-sm outline-none transition-colors" />
           </div>
 
-          {/* 💜 Dynamic Size Prices input structure with safety fallback */}
+          {/* Dynamic Size Prices input structure with safety fallback */}
           <div>
             <label className="text-[10px] font-bold tracking-wider text-purple-400/80 uppercase">Custom Size Prices Matrix (Format → Size:Price, Size:Price)</label>
             <input
@@ -254,6 +294,18 @@ export default function AdminDashboard() {
               value={sizePricesInput || ""}
               onChange={(e) => setSizePricesInput(e.target.value)}
               placeholder="UK 8:140, UK 9:160, UK 10:185"
+              className="w-full bg-neutral-950 border border-neutral-850 focus:border-purple-500 p-3 rounded-xl mt-1 text-sm outline-none font-mono text-purple-300 transition-colors"
+            />
+          </div>
+
+          {/* 💜 Dynamic Size Stocks input structure with format verification */}
+          <div>
+            <label className="text-[10px] font-bold tracking-wider text-purple-400/80 uppercase">Custom Size Stocks Matrix (Format → Size:Stock, Size:Stock)</label>
+            <input
+              type="text"
+              value={sizeStockInput || ""}
+              onChange={(e) => setSizeStockInput(e.target.value)}
+              placeholder="UK 8:12, UK 9:5, UK 10:0"
               className="w-full bg-neutral-950 border border-neutral-850 focus:border-purple-500 p-3 rounded-xl mt-1 text-sm outline-none font-mono text-purple-300 transition-colors"
             />
           </div>
@@ -300,7 +352,22 @@ export default function AdminDashboard() {
                   <img src={product.image} alt="" className="w-12 h-12 rounded-xl bg-neutral-950 border border-purple-950/30 object-cover" onError={(e) => { (e.target as HTMLImageElement).src = '/images/logo.png' }} />
                   <div>
                     <h3 className="text-sm font-bold text-gray-200">{product.name}</h3>
-                    <p className="text-xs text-purple-400 font-mono mt-0.5">£{product.price} • <span className="text-neutral-500 uppercase">{product.category}</span></p>
+                    <p className="text-xs text-purple-400 font-mono mt-0.5">
+                      £{product.price} • <span className="text-neutral-500 uppercase">{product.category}</span>
+                    </p>
+                    {/* Visual indicators to see stocks directly on lists */}
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {product.sizes && product.sizes.map(size => {
+                        const stock = product.size_stock?.[size] ?? 0;
+                        return (
+                          <span key={size} className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                            stock <= 0 ? "bg-red-500/10 text-red-400 border border-red-500/10" : "bg-neutral-900 text-gray-400 border border-neutral-850"
+                          }`}>
+                            {size}: {stock}
+                          </span>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
