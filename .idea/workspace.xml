@@ -1,15 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="684ae3c2-8600-409e-b151-d2580a6e7fdd" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/app/api/webhooks/stripe/route.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/admin/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/admin/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/checkout/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/checkout/route.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/product/[id]/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/product/[id]/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
-    </list>
+    <list default="true" id="684ae3c2-8600-409e-b151-d2580a6e7fdd" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -110,6 +102,7 @@
       <workItem from="1783703083511" duration="4821000" />
       <workItem from="1783862308624" duration="54000" />
       <workItem from="1783863565070" duration="8678000" />
+      <workItem from="1784218710927" duration="317000" />
     </task>
     <servers />
   </component>
