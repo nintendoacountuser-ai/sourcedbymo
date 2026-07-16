@@ -21,6 +21,7 @@ export default function AdminDashboard() {
   const [category, setCategory] = useState("shoes");
   const [status, setStatus] = useState("In Stock");
   const [sizesInput, setSizesInput] = useState("");
+  const [sizePricesInput, setSizePricesInput] = useState("");
   const [description, setDescription] = useState("");
 
   // Guard page and fetch active stock
@@ -43,14 +44,22 @@ export default function AdminDashboard() {
   // 📝 Trigger Edit Mode (Populates form with selected item details)
   const handleEditTrigger = (product: any) => {
     setIsEditing(true);
-    setId(product.id);
-    setName(product.name);
-    setPrice(product.price);
-    setImage(product.image);
-    setCategory(product.category);
-    setStatus(product.status);
-    setSizesInput(product.sizes ? product.sizes.join(", ") : "");
+    setId(product.id || "");
+    setName(product.name || "");
+    setPrice(product.price !== undefined && product.price !== null ? String(product.price) : "");
+    setImage(product.image || "");
+    setCategory(product.category || "shoes");
+    setStatus(product.status || "In Stock");
     setDescription(product.description || "");
+    setSizesInput(product.sizes ? product.sizes.join(", ") : "");
+
+    // 🧠 Convert JSON database object back to editable text layout safely
+    if (product.size_prices && Object.keys(product.size_prices).length > 0) {
+      const pairs = Object.entries(product.size_prices).map(([sz, pr]) => `${sz}:${pr}`);
+      setSizePricesInput(pairs.join(", "));
+    } else {
+      setSizePricesInput("");
+    }
 
     // Smoothly scroll straight back to the top form layout
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -59,7 +68,15 @@ export default function AdminDashboard() {
   // ❌ Cancel Editing Back Button Logic
   const handleCancelEdit = () => {
     setIsEditing(false);
-    setId(""); setName(""); setPrice(""); setImage(""); setSizesInput(""); setDescription("");
+    setId("");
+    setName("");
+    setPrice("");
+    setImage("");
+    setCategory("shoes");
+    setStatus("In Stock");
+    setSizesInput("");
+    setSizePricesInput("");
+    setDescription("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -67,13 +84,35 @@ export default function AdminDashboard() {
     setLoading(true);
     setMessage("");
 
-    const sizesArray = sizesInput ? sizesInput.split(",").map(s => s.trim()) : [];
+    const sizesArray = sizesInput ? sizesInput.split(",").map(s => s.trim()).filter(Boolean) : [];
+
+    // 🧠 Parse the "UK 8:140, UK 9:160" text safely into a structured JSON Map object
+    const sizePricesMap: Record<string, number> = {};
+    if (sizePricesInput) {
+      sizePricesInput.split(",").forEach(pair => {
+        const [sizeKey, priceVal] = pair.split(":");
+        if (sizeKey && priceVal) {
+          sizePricesMap[sizeKey.trim()] = Number(priceVal.trim());
+        }
+      });
+    }
+
+    const payload = {
+      name,
+      price: price ? Number(price) : 0,
+      image,
+      category,
+      status,
+      sizes: sizesArray,
+      size_prices: sizePricesMap,
+      description
+    };
 
     if (isEditing) {
       // 🛠️ UPDATE Query
       const { error } = await supabase
         .from("products")
-        .update({ name, price, image, category, status, sizes: sizesArray, description })
+        .update(payload)
         .eq("id", id);
 
       setLoading(false);
@@ -81,13 +120,13 @@ export default function AdminDashboard() {
         setMessage(`❌ Error updating product: ${error.message}`);
       } else {
         setMessage("✅ Product edits saved successfully to live database!");
-        handleCancelEdit(); // Turn off edit mode and clear form fields
+        handleCancelEdit();
         fetchCurrentInventory();
       }
     } else {
       // ➕ INSERT Query
       const { error } = await supabase.from("products").insert([
-        { id, name, price, image, category, status, sizes: sizesArray, description }
+        { id, ...payload }
       ]);
 
       setLoading(false);
@@ -95,7 +134,7 @@ export default function AdminDashboard() {
         setMessage(`❌ Error adding product: ${error.message}`);
       } else {
         setMessage("✅ Product successfully uploaded straight to the live database!");
-        setId(""); setName(""); setPrice(""); setImage(""); setSizesInput(""); setDescription("");
+        handleCancelEdit();
         fetchCurrentInventory();
       }
     }
@@ -113,14 +152,13 @@ export default function AdminDashboard() {
     } else {
       setMessage(`🗑️ Removed "${productName}" successfully.`);
       if (isEditing && id === productId) {
-        handleCancelEdit(); // If editing the deleted item, drop out of edit mode
+        handleCancelEdit();
       }
       fetchCurrentInventory();
     }
   };
 
   return (
-    /* 💜 Base background gradient shifted to the new signature purple atmosphere */
     <main className="min-h-screen bg-gradient-to-b from-[#0f0a1c] via-[#050507] to-[#020203] text-white flex flex-col items-center p-6 space-y-8 selection:bg-purple-500 selection:text-white">
 
       {/* 1. MANAGEMENT FORM CONTAINER */}
@@ -137,13 +175,11 @@ export default function AdminDashboard() {
             ← Leave Workspace
           </button>
           <div className="flex items-center gap-2">
-            {/* 💜 Status Badge flipped to purple accent profiling */}
             {isEditing && <span className="text-[10px] bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded-md font-bold animate-pulse">EDIT MODE</span>}
             <span className="text-xs font-mono tracking-widest text-neutral-600 uppercase">Secure Environment</span>
           </div>
         </div>
 
-        {/* 💜 Headers changed to premium purple configuration text styling */}
         <h1 className="text-3xl font-black text-gray-100 tracking-tight">
           {isEditing ? "Modify Stock Record" : "Catalog Management"}
         </h1>
@@ -151,7 +187,6 @@ export default function AdminDashboard() {
           {isEditing ? `Modifying existing product configurations for ID: ${id}` : "Inject dynamic items straight into production inventory tables."}
         </p>
 
-        {/* 💜 Dynamic Action message alerts shifted over to high-end purple */}
         {message && <p className="mt-4 p-3 bg-neutral-950 border border-purple-950/20 rounded-xl text-center text-sm font-semibold text-purple-400 animate-pulse">{message}</p>}
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -160,35 +195,35 @@ export default function AdminDashboard() {
               <label className="text-[10px] font-bold tracking-wider text-purple-400/80 uppercase">Unique Web ID</label>
               <input
                 type="text"
-                value={id}
+                value={id || ""}
                 onChange={(e) => setId(e.target.value)}
                 disabled={isEditing}
                 placeholder="nike-dunk-grey"
-                className={`w-full bg-neutral-950 border border-neutral-850 p-3 rounded-xl mt-1 text-sm focus:border-purple-500 outline-none transition-colors ${isEditing ? 'text-neutral-500 cursor-not-allowed bg-neutral-900 border-neutral-850' : ''}`}
+                className={`w-full bg-neutral-950 border border-neutral-850 p-3 rounded-xl mt-1 text-sm focus:border-purple-500 outline-none transition-colors ${isEditing ? 'text-neutral-500 cursor-not-allowed bg-neutral-900 border-neutral-850 focus:border-neutral-850' : ''}`}
                 required
               />
             </div>
             <div>
               <label className="text-[10px] font-bold tracking-wider text-purple-400/80 uppercase">Display Name</label>
-              <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nike Dunk Low Grey" className="w-full bg-neutral-950 border border-neutral-850 focus:border-purple-500 p-3 rounded-xl mt-1 text-sm outline-none transition-colors" required />
+              <input type="text" value={name || ""} onChange={(e) => setName(e.target.value)} placeholder="Nike Dunk Low Grey" className="w-full bg-neutral-950 border border-neutral-850 focus:border-purple-500 p-3 rounded-xl mt-1 text-sm outline-none transition-colors" required />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-[10px] font-bold tracking-wider text-purple-400/80 uppercase">Retail Price</label>
-              <input type="text" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="£140" className="w-full bg-neutral-950 border border-neutral-850 focus:border-purple-500 p-3 rounded-xl mt-1 text-sm outline-none transition-colors" required />
+              <label className="text-[10px] font-bold tracking-wider text-purple-400/80 uppercase">Base Fallback Price</label>
+              <input type="text" value={price || ""} onChange={(e) => setPrice(e.target.value)} placeholder="140" className="w-full bg-neutral-950 border border-neutral-850 focus:border-purple-500 p-3 rounded-xl mt-1 text-sm outline-none transition-colors" required />
             </div>
             <div>
               <label className="text-[10px] font-bold tracking-wider text-purple-400/80 uppercase">Image Asset Path</label>
-              <input type="text" value={image} onChange={(e) => setImage(e.target.value)} placeholder="/images/dunk.jpg" className="w-full bg-neutral-950 border border-neutral-850 focus:border-purple-500 p-3 rounded-xl mt-1 text-sm outline-none transition-colors" required />
+              <input type="text" value={image || ""} onChange={(e) => setImage(e.target.value)} placeholder="/images/dunk.jpg" className="w-full bg-neutral-950 border border-neutral-850 focus:border-purple-500 p-3 rounded-xl mt-1 text-sm outline-none transition-colors" required />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-[10px] font-bold tracking-wider text-purple-400/80 uppercase">Category Allocation</label>
-              <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full bg-neutral-950 border border-neutral-850 focus:border-purple-500 p-3 rounded-xl mt-1 text-sm outline-none transition-colors text-gray-300">
+              <select value={category || "shoes"} onChange={(e) => setCategory(e.target.value)} className="w-full bg-neutral-950 border border-neutral-850 focus:border-purple-500 p-3 rounded-xl mt-1 text-sm outline-none transition-colors text-gray-300">
                 <option value="shoes">Shoes</option>
                 <option value="clothing">Clothing</option>
                 <option value="jackets">Jackets</option>
@@ -198,7 +233,7 @@ export default function AdminDashboard() {
             </div>
             <div>
               <label className="text-[10px] font-bold tracking-wider text-purple-400/80 uppercase">Stock Status</label>
-              <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full bg-neutral-950 border border-neutral-850 focus:border-purple-500 p-3 rounded-xl mt-1 text-sm outline-none transition-colors text-gray-300">
+              <select value={status || "In Stock"} onChange={(e) => setStatus(e.target.value)} className="w-full bg-neutral-950 border border-neutral-850 focus:border-purple-500 p-3 rounded-xl mt-1 text-sm outline-none transition-colors text-gray-300">
                 <option value="In Stock">In Stock</option>
                 <option value="Low Stock">Low Stock</option>
                 <option value="Allocated / Sold">Allocated / Sold</option>
@@ -208,12 +243,24 @@ export default function AdminDashboard() {
 
           <div>
             <label className="text-[10px] font-bold tracking-wider text-purple-400/80 uppercase">Available Sizes (Separate with commas)</label>
-            <input type="text" value={sizesInput} onChange={(e) => setSizesInput(e.target.value)} placeholder="UK 8, UK 9, UK 10" className="w-full bg-neutral-950 border border-neutral-850 focus:border-purple-500 p-3 rounded-xl mt-1 text-sm outline-none transition-colors" />
+            <input type="text" value={sizesInput || ""} onChange={(e) => setSizesInput(e.target.value)} placeholder="UK 8, UK 9, UK 10" className="w-full bg-neutral-950 border border-neutral-850 focus:border-purple-500 p-3 rounded-xl mt-1 text-sm outline-none transition-colors" />
+          </div>
+
+          {/* 💜 Dynamic Size Prices input structure with safety fallback */}
+          <div>
+            <label className="text-[10px] font-bold tracking-wider text-purple-400/80 uppercase">Custom Size Prices Matrix (Format → Size:Price, Size:Price)</label>
+            <input
+              type="text"
+              value={sizePricesInput || ""}
+              onChange={(e) => setSizePricesInput(e.target.value)}
+              placeholder="UK 8:140, UK 9:160, UK 10:185"
+              className="w-full bg-neutral-950 border border-neutral-850 focus:border-purple-500 p-3 rounded-xl mt-1 text-sm outline-none font-mono text-purple-300 transition-colors"
+            />
           </div>
 
           <div>
             <label className="text-[10px] font-bold tracking-wider text-purple-400/80 uppercase">Product Description Sheet</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Provide premium item summary metrics..." className="w-full bg-neutral-950 border border-neutral-850 focus:border-purple-500 p-3 rounded-xl mt-1 text-sm outline-none transition-colors" />
+            <textarea value={description || ""} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Provide premium item summary metrics..." className="w-full bg-neutral-950 border border-neutral-850 focus:border-purple-500 p-3 rounded-xl mt-1 text-sm outline-none transition-colors" />
           </div>
 
           {/* Action Row containing Buttons */}
@@ -227,7 +274,6 @@ export default function AdminDashboard() {
                 Cancel / Back
               </button>
             )}
-            {/* 💜 Primary submission CTA wrapped to full crown neon purple scaling gradients */}
             <button
               type="submit"
               disabled={loading}
@@ -254,13 +300,11 @@ export default function AdminDashboard() {
                   <img src={product.image} alt="" className="w-12 h-12 rounded-xl bg-neutral-950 border border-purple-950/30 object-cover" onError={(e) => { (e.target as HTMLImageElement).src = '/images/logo.png' }} />
                   <div>
                     <h3 className="text-sm font-bold text-gray-200">{product.name}</h3>
-                    {/* 💜 Inline text identifiers modified to match purple details formatting */}
-                    <p className="text-xs text-purple-400 font-mono mt-0.5">{product.price} • <span className="text-neutral-500 uppercase">{product.category}</span></p>
+                    <p className="text-xs text-purple-400 font-mono mt-0.5">£{product.price} • <span className="text-neutral-500 uppercase">{product.category}</span></p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {/* 💜 Row action buttons themed to purple accents */}
                   <button
                     onClick={() => handleEditTrigger(product)}
                     className="px-3 py-1.5 text-xs font-bold text-purple-400 bg-purple-500/5 border border-purple-500/10 rounded-xl hover:bg-purple-500/20 active:scale-95 transition-all cursor-pointer shadow-sm"

@@ -1,65 +1,73 @@
-// app/api/checkout/route.ts
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
-const secretKey = process.env.STRIPE_SECRET_KEY || "";
-
-// 🎯 Removed apiVersion completely so Stripe uses your account's default stable version
-const stripe = new Stripe(secretKey);
-
-interface CheckoutRequestBody {
-  productName: string;
-  price: string | number;
-  image?: string;
-  selectedSize?: string;
+if (!process.env.STRIPE_SECRET_KEY) {
+  console.error("CRITICAL: STRIPE_SECRET_KEY is missing from environment variables!");
 }
 
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
+
 export async function POST(request: Request) {
-  if (!secretKey) {
-    console.error("❌ STRIPE_SECRET_KEY is completely missing from your environmental setup!");
-    return NextResponse.json({ error: "Stripe key is not configured." }, { status: 500 });
-  }
-
   try {
-    const body = (await request.json()) as CheckoutRequestBody;
-    const { productName, price, image, selectedSize } = body;
+    // 💜 Fix 1: Make sure 'size' is pulled alongside name, price, image, and quantity
+    const { name, price, image, quantity, size } = await request.json();
 
-    const rawNumericPrice = typeof price === "string"
-      ? parseFloat(price.replace(/[^0-9.]/g, ""))
-      : price;
-
-    // Fixed 'throw of exception caught locally' error by returning a clean response directly
-    if (isNaN(rawNumericPrice)) {
-      console.error(`Invalid price argument parse error: ${price}`);
-      return NextResponse.json({ error: "Invalid price format structural data." }, { status: 400 });
+    if (!name || !price) {
+      return NextResponse.json(
+        { error: `Missing payload elements. Name: ${name}, Price: ${price}` },
+        { status: 400 }
+      );
     }
+
+    const unitAmount = Math.round(Number(price) * 100);
+    if (isNaN(unitAmount) || unitAmount <= 0) {
+      return NextResponse.json(
+        { error: `Invalid parsed currency calculation total: ${price}` },
+        { status: 400 }
+      );
+    }
+
+    const origin = request.headers.get("origin") || "http://localhost:3000";
+
+    const stripeImages = image && (image.startsWith("http://") || image.startsWith("https://"))
+      ? [image]
+      : [];
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
-      /* 🎯 Forces Stripe to create a customer profile and collect their email address */
-      customer_creation: "always",
       line_items: [
         {
           price_data: {
             currency: "gbp",
             product_data: {
-              name: `${productName}${selectedSize && selectedSize !== "Default" ? ` (Size: ${selectedSize})` : ""}`,
-              images: image && image.startsWith("http") ? [image] : [],
+              name: name,
+              images: stripeImages, // 💜 Fix 2: 'stripeImages' is now actively consumed here
             },
-            unit_amount: Math.round(rawNumericPrice * 100),
+            unit_amount: unitAmount,
           },
-          quantity: 1,
+          quantity: quantity ? Number(quantity) : 1,
         },
       ],
       mode: "payment",
-      success_url: `${request.headers.get("origin")}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${request.headers.get("origin")}/`,
+
+      // 💜 Fix 3: Passed the destructured 'size' parameter straight into metadata safely
+      metadata: {
+        productName: name,
+        size: size || "Not Specified",
+        quantity: quantity ? quantity.toString() : "1"
+      },
+
+      success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/`,
     });
 
-    return NextResponse.json({ id: session.id, url: session.url });
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : "Unknown checkout context error";
-    console.error("Stripe Session Creation Internal Error:", errorMessage);
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json({ url: session.url });
+  } catch (error) { // 💜 Fix 4: Removed ': any' to clear ESLint warnings completely
+    const errorMessage = error instanceof Error ? error.message : "Internal Stripe Gateway Crash";
+    console.error("Stripe gateway pipeline failure:", error);
+    return NextResponse.json(
+      { error: errorMessage },
+      { status: 500 }
+    );
   }
 }
