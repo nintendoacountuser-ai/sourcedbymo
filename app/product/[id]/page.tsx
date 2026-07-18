@@ -17,6 +17,7 @@ interface ProductData {
   size_prices?: Record<string, string | number>;
   size_stock?: Record<string, number>; // 💜 Added size stock type mapping
   description?: string;
+  shipping_type?: "in_hand" | "import"; // 💜 Added tracking flag for sourcing type
 }
 
 export default function ProductPage({ params }: { params: Promise<{ id: string }> }) {
@@ -30,9 +31,12 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
   const [selectedSize, setSelectedSize] = useState<string>("");
   const [quantity, setQuantity] = useState<number>(1);
   const [checkoutLoading, setCheckoutLoading] = useState<boolean>(false);
+  const [acknowledgedNotice, setAcknowledgedNotice] = useState<boolean>(false); // 💜 Compliance state checkbox
 
   // Helper: Fetch remaining stock for a size safely
   const getStockForSize = (p: ProductData, size: string): number => {
+    // 💜 Import lines are unlimited since they are sourced on-demand from overseas
+    if (p.shipping_type === "import") return 999;
     if (p.size_stock && p.size_stock[size] !== undefined) {
       return Number(p.size_stock[size]);
     }
@@ -57,6 +61,11 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
             (size) => getStockForSize(fetchedProduct, size) > 0
           );
           setSelectedSize(firstInStockSize || fetchedProduct.sizes[0]);
+
+          // 💜 Set initial quantity appropriately if first size is out of stock on local lines
+          if (fetchedProduct.shipping_type !== "import" && (!firstInStockSize || getStockForSize(fetchedProduct, firstInStockSize) <= 0)) {
+            setQuantity(0);
+          }
         }
       }
       setLoading(false);
@@ -82,7 +91,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
     );
   }
 
-  // Helper mapping helper exposed to outer component render context
+  const isImport = product.shipping_type === "import";
   const currentStockForSize = selectedSize ? getStockForSize(product, selectedSize) : 0;
 
   const getPriceForSize = (size: string): number => {
@@ -98,6 +107,9 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
   // 💜 Check current selected item stock status
   const isOutOfStock = currentStockForSize <= 0;
 
+  // 💜 Structural validation guard checking conditions across compliance and availability
+  const cannotCheckout = checkoutLoading || isOutOfStock || (isImport && !acknowledgedNotice);
+
   // 💜 Safe Size Selection: Resets quantity logic to max available stock bounds
   const handleSizeChange = (size: string) => {
     setSelectedSize(size);
@@ -110,7 +122,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
   };
 
   const handleCheckout = async () => {
-    if (isOutOfStock) return;
+    if (cannotCheckout) return;
     setCheckoutLoading(true);
     try {
       const response = await fetch("/api/checkout", {
@@ -118,7 +130,8 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           productId: product.id,
-          name: `${product.name} (${selectedSize})`,
+          // 💜 Clear metadata notification marking item processing line attributes explicitly
+          name: `${product.name} (${selectedSize})${isImport ? " [Pre-Order]" : ""}`,
           price: currentUnitPrice,
           image: product.image,
           quantity: quantity,
@@ -170,8 +183,13 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
 
         <div className="flex flex-col justify-between">
           <div>
-            <span className="text-[10px] font-bold tracking-widest uppercase bg-purple-500/10 px-2.5 py-1 rounded-full border border-purple-500/20 text-purple-400">
-              {product.status || "Secure Line"}
+            {/* 💜 Enhanced Pill Design for Clarity */}
+            <span className={`text-[10px] font-extrabold tracking-widest uppercase px-2.5 py-1 rounded-full border ${
+              isImport 
+                ? "bg-amber-500/10 border-amber-500/30 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.05)]" 
+                : "bg-purple-500/10 border-purple-500/20 text-purple-400"
+            }`}>
+              {isImport ? "⚡ Global Import Line (2+ Weeks)" : product.status || "In Hand"}
             </span>
             <h1 className="text-2xl md:text-3xl font-black mt-3 text-gray-100 tracking-tight">{product.name}</h1>
             <p className="mt-4 text-xs md:text-sm text-gray-400 leading-relaxed">{product.description || "No supplemental metrics declared."}</p>
@@ -193,15 +211,15 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                           outOfStock
                             ? "bg-neutral-950/30 border-neutral-950 text-neutral-600 cursor-not-allowed opacity-50"
                             : selectedSize === size
-                              ? "bg-purple-600 text-white border-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.3)]"
+                              ? isImport
+                                ? "bg-amber-600 text-white border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.3)]"
+                                : "bg-purple-600 text-white border-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.3)]"
                               : "bg-neutral-950 text-gray-400 border-neutral-900 hover:text-white hover:border-purple-950"
                         }`}
                       >
                         <span>{size} {product.size_prices && product.size_prices[size] && `(£${product.size_prices[size]})`}</span>
-                        <span className={`text-[8px] font-semibold mt-0.5 uppercase tracking-wide ${
-                          outOfStock ? "text-red-500" : "text-purple-400/70"
-                        }`}>
-                          {outOfStock ? "Out of Stock" : `${stock} left`}
+                        <span className={`text-[8px] font-semibold mt-0.5 uppercase tracking-wide ${selectedSize === size ? "text-white/90" : "text-purple-400/70"}`}>
+                          {isImport ? "Available" : outOfStock ? "Out of Stock" : `${stock} left`}
                         </span>
                       </button>
                     );
@@ -226,7 +244,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                 </span>
                 <button
                   type="button"
-                  disabled={isOutOfStock || quantity >= currentStockForSize}
+                  disabled={isOutOfStock || (!isImport && quantity >= currentStockForSize)}
                   onClick={() => setQuantity(quantity + 1)}
                   className="w-8 h-8 flex items-center justify-center font-bold text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
                 >
@@ -237,28 +255,53 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
           </div>
 
           <div className="mt-8 pt-6 border-t border-purple-950/20">
+
+            {/* 💜 Enhanced High-Visibility Sourcing Compliance Box */}
+            {isImport && (
+              <div className="mb-4 p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/20 text-left transition-colors duration-300">
+                <p className="text-[11px] text-amber-200/90 leading-normal font-medium mb-3.5">
+                  <strong className="text-amber-400">Notice of Procurement:</strong> This item is not currently held in local physical inventory. Upon payment confirmation, your order will be sourced and ordered directly from production. Delivery is estimated at 2+ weeks.
+                </p>
+                <label className="flex items-center gap-2.5 text-[10px] text-gray-300 font-bold uppercase select-none cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={acknowledgedNotice}
+                    onChange={(e) => setAcknowledgedNotice(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-amber-500 rounded border-neutral-800 bg-neutral-950 transition-transform group-active:scale-90"
+                  />
+                  <span>I understand and accept terms</span>
+                </label>
+              </div>
+            )}
+
             <div className="flex items-baseline justify-between mb-4">
               <span className="text-xs text-neutral-500 font-medium">Total Price:</span>
-              <span className="text-2xl font-black text-purple-400">
+              <span className={`text-2xl font-black ${isImport ? "text-amber-400" : "text-purple-400"}`}>
                 {isOutOfStock ? "£0" : `£${totalPrice}`}
               </span>
             </div>
 
-            {/* 💜 Fixed: Converted to Tailwind v4 class 'bg-linear-to-r' & supports active stock checking */}
+            {/* 💜 Fixed: Dynamically themes between Purple (In Hand) and Amber (Import Lines) */}
             <button
               onClick={handleCheckout}
-              disabled={checkoutLoading || isOutOfStock}
+              disabled={cannotCheckout}
               className={`w-full py-4 font-extrabold text-xs tracking-wider uppercase rounded-xl text-white transition-all cursor-pointer ${
-                isOutOfStock
+                cannotCheckout
                   ? "bg-neutral-950 text-neutral-600 border border-neutral-900 cursor-not-allowed opacity-50"
-                  : "bg-linear-to-r from-purple-600 to-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.2)] hover:brightness-110 active:scale-[0.99] disabled:opacity-50"
+                  : isImport
+                    ? "bg-linear-to-r from-amber-600 to-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)] hover:brightness-110 active:scale-[0.99]"
+                    : "bg-linear-to-r from-purple-600 to-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.2)] hover:brightness-110 active:scale-[0.99]"
               }`}
             >
               {checkoutLoading
                 ? "Acquiring Secure Session..."
-                : isOutOfStock
-                  ? "Selected Size Out of Stock"
-                  : "Secure Order Line"}
+                : isImport && !acknowledgedNotice
+                  ? "Acknowledge Notice to Proceed"
+                  : isOutOfStock
+                    ? "Selected Size Out of Stock"
+                    : isImport
+                      ? "Secure Import Order Line"
+                      : "Secure Order Line"}
             </button>
           </div>
         </div>

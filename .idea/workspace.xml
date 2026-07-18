@@ -4,8 +4,7 @@
     <list default="true" id="684ae3c2-8600-409e-b151-d2580a6e7fdd" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/admin/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/admin/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/checkout/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/checkout/route.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/webhooks/stripe/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/webhooks/stripe/route.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/page.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/product/[id]/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/product/[id]/page.tsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -108,7 +107,8 @@
       <workItem from="1783703083511" duration="4821000" />
       <workItem from="1783862308624" duration="54000" />
       <workItem from="1783863565070" duration="8678000" />
-      <workItem from="1784218710927" duration="2800000" />
+      <workItem from="1784218710927" duration="3448000" />
+      <workItem from="1784384199920" duration="1775000" />
     </task>
     <servers />
   </component>

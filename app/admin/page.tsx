@@ -15,6 +15,7 @@ interface DBProduct {
   size_prices: Record<string, number>;
   size_stock: Record<string, number>;
   description: string;
+  shipping_type: "in_hand" | "import"; // 💜 Added tracking flag parameter mapping
 }
 
 export default function AdminDashboard() {
@@ -33,6 +34,7 @@ export default function AdminDashboard() {
   const [image, setImage] = useState("");
   const [category, setCategory] = useState("shoes");
   const [status, setStatus] = useState("In Stock");
+  const [shippingType, setShippingType] = useState<"in_hand" | "import">("in_hand"); // 💜 Admin dashboard selection state
   const [sizesInput, setSizesInput] = useState("");
   const [sizePricesInput, setSizePricesInput] = useState("");
   const [sizeStockInput, setSizeStockInput] = useState(""); // 💜 State to manage stock values via textbox
@@ -64,6 +66,7 @@ export default function AdminDashboard() {
     setImage(product.image || "");
     setCategory(product.category || "shoes");
     setStatus(product.status || "In Stock");
+    setShippingType(product.shipping_type || "in_hand"); // 💜 Populate toggle state value context
     setDescription(product.description || "");
     setSizesInput(product.sizes ? product.sizes.join(", ") : "");
 
@@ -96,6 +99,7 @@ export default function AdminDashboard() {
     setImage("");
     setCategory("shoes");
     setStatus("In Stock");
+    setShippingType("in_hand"); // 💜 Reset configuration toggle safely
     setSizesInput("");
     setSizePricesInput("");
     setSizeStockInput(""); // 💜 Reset stock text state
@@ -142,6 +146,7 @@ export default function AdminDashboard() {
       image,
       category,
       status,
+      shipping_type: shippingType, // 💜 Added routing parameter logic to operational database payloads
       sizes: sizesArray,
       size_prices: sizePricesMap,
       size_stock: sizeStockMap, // 💜 Added database payload record
@@ -281,6 +286,19 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          {/* 💜 Added Inventory Logistics Type Selection Form Segment */}
+          <div>
+            <label className="text-[10px] font-bold tracking-wider text-purple-400/80 uppercase">Inventory Sourcing Line</label>
+            <select
+              value={shippingType}
+              onChange={(e) => setShippingType(e.target.value as "in_hand" | "import")}
+              className="w-full bg-neutral-950 border border-neutral-850 focus:border-purple-500 p-3 rounded-xl mt-1 text-sm outline-none transition-colors text-gray-300"
+            >
+              <option value="in_hand">In Hand (Physically at house / Shipped instantly)</option>
+              <option value="import">Global Import Line (Ordered on demand from China / 2+ weeks)</option>
+            </select>
+          </div>
+
           <div>
             <label className="text-[10px] font-bold tracking-wider text-purple-400/80 uppercase">Available Sizes (Separate with commas)</label>
             <input type="text" value={sizesInput || ""} onChange={(e) => setSizesInput(e.target.value)} placeholder="UK 8, UK 9, UK 10" className="w-full bg-neutral-950 border border-neutral-850 focus:border-purple-500 p-3 rounded-xl mt-1 text-sm outline-none transition-colors" />
@@ -351,7 +369,17 @@ export default function AdminDashboard() {
                 <div className="flex items-center gap-4">
                   <img src={product.image} alt="" className="w-12 h-12 rounded-xl bg-neutral-950 border border-purple-950/30 object-cover" onError={(e) => { (e.target as HTMLImageElement).src = '/images/logo.png' }} />
                   <div>
-                    <h3 className="text-sm font-bold text-gray-200">{product.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-gray-200">{product.name}</h3>
+                      {/* 💜 Status Badge showing line routing configurations visually */}
+                      <span className={`text-[8px] px-1.5 py-0.5 rounded font-black tracking-wider uppercase ${
+                        product.shipping_type === "import" 
+                          ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" 
+                          : "bg-purple-500/10 text-purple-400 border border-purple-500/20"
+                      }`}>
+                        {product.shipping_type === "import" ? "China Import" : "In Hand"}
+                      </span>
+                    </div>
                     <p className="text-xs text-purple-400 font-mono mt-0.5">
                       £{product.price} • <span className="text-neutral-500 uppercase">{product.category}</span>
                     </p>
@@ -361,9 +389,13 @@ export default function AdminDashboard() {
                         const stock = product.size_stock?.[size] ?? 0;
                         return (
                           <span key={size} className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
-                            stock <= 0 ? "bg-red-500/10 text-red-400 border border-red-500/10" : "bg-neutral-900 text-gray-400 border border-neutral-850"
+                            product.shipping_type === "import"
+                              ? "bg-neutral-900 text-amber-400/80 border border-neutral-850"
+                              : stock <= 0 
+                                ? "bg-red-500/10 text-red-400 border border-red-500/10" 
+                                : "bg-neutral-900 text-gray-400 border border-neutral-850"
                           }`}>
-                            {size}: {stock}
+                            {size}: {product.shipping_type === "import" ? "∞" : stock}
                           </span>
                         );
                       })}
