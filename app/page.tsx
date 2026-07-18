@@ -67,11 +67,12 @@ export default function Home() {
         <div className="w-full space-y-12 transition-all duration-500 ease-in-out">
           {inHand.length > 0 && (
             <div className="animate-fadeIn">
-              <div className="flex items-center gap-3 mb-6 border-b border-purple-950/20 pb-2">
+              <div className="flex items-center justify-center gap-3 mb-6 border-b border-purple-950/20 pb-2 max-w-5xl mx-auto">
                 <span className="h-2 w-2 rounded-full bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]" />
                 <h3 className="text-sm font-extrabold tracking-widest text-purple-400 uppercase">In Hand Stock (Instant Delivery)</h3>
               </div>
-              <div className="w-full flex flex-wrap justify-start items-center gap-4 md:gap-8 max-w-5xl mx-auto px-2 transition-all duration-500">
+              {/* Centered layout row structure for category results */}
+              <div className="w-full flex flex-wrap justify-center items-center gap-3 md:gap-6 max-w-5xl mx-auto px-1 md:px-2 transition-all duration-500">
                 {inHand.map((product, index) => (
                   <ProductItem key={product.id} product={product} index={index} />
                 ))}
@@ -81,11 +82,11 @@ export default function Home() {
 
           {imports.length > 0 && (
             <div className="animate-fadeIn">
-              <div className="flex items-center gap-3 mb-6 border-b border-amber-950/30 pb-2">
+              <div className="flex items-center justify-center gap-3 mb-6 border-b border-amber-950/30 pb-2 max-w-5xl mx-auto">
                 <span className="h-2 w-2 rounded-full bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]" />
                 <h3 className="text-sm font-extrabold tracking-widest text-amber-400 uppercase">Global Import Line (Sourced on Request • 2+ Weeks)</h3>
               </div>
-              <div className="w-full flex flex-wrap justify-start items-center gap-4 md:gap-8 max-w-5xl mx-auto px-2 transition-all duration-500">
+              <div className="w-full flex flex-wrap justify-center items-center gap-3 md:gap-6 max-w-5xl mx-auto px-1 md:px-2 transition-all duration-500">
                 {imports.map((product, index) => (
                   <ProductItem key={product.id} product={product} index={index} />
                 ))}
@@ -113,7 +114,8 @@ export default function Home() {
     if (homeFeaturedProducts.length === 0) return <EmptyState />;
 
     return (
-      <div className="w-full flex flex-wrap justify-center items-center gap-4 md:gap-8 max-w-5xl mx-auto px-2 transition-all duration-500 ease-in-out">
+      /* Fixed: Replaced rigid layout grids with global flex justification properties to force center rows */
+      <div className="w-full flex flex-wrap justify-center items-center gap-3 md:gap-6 max-w-5xl mx-auto px-1 md:px-2 transition-all duration-500 ease-in-out">
         {homeFeaturedProducts.map((product, index) => (
           <ProductItem key={`${product.id}-${shippingSort}`} product={product} index={index} />
         ))}
@@ -132,7 +134,7 @@ export default function Home() {
 
   const ProductItem = ({ product, index }: { product: Product; index: number }) => (
     <div
-      className="w-[calc(100%-12px)] sm:w-55 flex justify-center shrink-0 relative group transition-all duration-300 transform hover:-translate-y-1.5 backface-hidden"
+      className="w-[calc(50%-6px)] sm:w-[220px] flex justify-center shrink-0 relative group transition-all duration-300 transform hover:-translate-y-1.5 backface-hidden"
       style={{
         animation: `fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) ${Math.min(index * 0.03, 0.2)}s both`
       }}
@@ -142,7 +144,9 @@ export default function Home() {
           Import
         </span>
       )}
-      <ProductCard id={product.id} name={product.name} price={product.price} image={product.image} />
+      <div className="w-full">
+        <ProductCard id={product.id} name={product.name} price={product.price} image={product.image} />
+      </div>
     </div>
   );
 
@@ -218,9 +222,9 @@ export default function Home() {
             {activeCategory === "all" ? "Featured Products" : `${activeCategory} Collection`}
           </h2>
 
-          {/* ⚡ Refined Sorting Pill Group matching Nav Bar Transitions exactly */}
+          {/* Inline Sorting Pill Group */}
           {activeCategory === "all" && (
-            <div className="flex items-center justify-center p-1.5 rounded-2xl bg-[#0d0a14]/60 backdrop-blur-lg border border-purple-950/20 mb-10 gap-2 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
+            <div className="flex items-center justify-center p-1.5 rounded-2xl bg-[#0d0a14]/60 backdrop-blur-lg border border-purple-950/20 mb-10 gap-2 shadow-[0_4px_20px_rgba(0,0,0,0.4)] transition-all duration-300">
               <button
                 type="button"
                 onClick={() => setShippingSort("all")}
