@@ -2,71 +2,92 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
-  console.error("CRITICAL: STRIPE_SECRET_KEY is missing from environment variables!");
+  console.error("CRITICAL: STRIPE_SECRET_KEY is missing!");
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 
 export async function POST(request: Request) {
   try {
-    // 💜 Fix 1: Extract 'productId' from payload so it can be used below!
-    const { productId, name, price, image, quantity, size } = await request.json();
+    const body = await request.json();
 
-    if (!productId || !name || !price) {
-      return NextResponse.json(
-        { error: `Missing payload elements. Product ID: ${productId}, Name: ${name}, Price: ${price}` },
-        { status: 400 }
-      );
+    let lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
+    let metadata: Record<string, string> = {};
+
+    // CHECK IF PAYLOAD IS FROM CART (ARRAY OF ITEMS)
+    if (body.items && Array.isArray(body.items)) {
+      lineItems = body.items.map((item: any) => {
+        const stripeImages =
+          item.image && (item.image.startsWith("http://") || item.image.startsWith("https://"))
+            ? [item.image]
+            : [];
+
+        return {
+          price_data: {
+            currency: "gbp",
+            product_data: {
+              name: item.name,
+              images: stripeImages,
+            },
+            unit_amount: Math.round(Number(item.price) * 100),
+          },
+          quantity: Number(item.quantity) || 1,
+        };
+      });
+
+      metadata = { type: "cart_checkout", itemCount: String(body.items.length) };
     }
+    // OTHERWISE HANDLE SINGLE ITEM PAYLOAD (BUY NOW)
+    else {
+      const { productId, name, price, image, quantity, size } = body;
 
-    const unitAmount = Math.round(Number(price) * 100);
-    if (isNaN(unitAmount) || unitAmount <= 0) {
-      return NextResponse.json(
-        { error: `Invalid parsed currency calculation total: ${price}` },
-        { status: 400 }
-      );
-    }
+      if (!productId || !name || !price) {
+        return NextResponse.json(
+          { error: "Missing required product details for checkout." },
+          { status: 400 }
+        );
+      }
 
-    // Stripe only accepts absolute HTTPS links for checkout images.
-    // This safely keeps relative paths from crashing checkout.
-    const stripeImages = image && (image.startsWith("http://") || image.startsWith("https://"))
-      ? [image]
-      : [];
+      const stripeImages =
+        image && (image.startsWith("http://") || image.startsWith("https://"))
+          ? [image]
+          : [];
 
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: [
+      lineItems = [
         {
           price_data: {
             currency: "gbp",
             product_data: {
-              name: name, // e.g. "Nike Dunk Low Grey (UK 9)"
-              images: stripeImages, // 💜 Fix 2: Use the verified absolute image array
+              name: name,
+              images: stripeImages,
             },
-            unit_amount: unitAmount, // 💜 Fix 3: Use the pre-calculated, verified unit amount
+            unit_amount: Math.round(Number(price) * 100),
           },
           quantity: Number(quantity) || 1,
         },
-      ],
+      ];
+
+      metadata = {
+        productId: String(productId),
+        productName: String(name),
+        size: String(size || "Standard"),
+        quantity: String(quantity || "1"),
+      };
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: lineItems,
       mode: "payment",
       success_url: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/success`,
-      cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/product/${productId}`,
-      // 💜 Pass all metadata safely so webhook can capture it properly
-      metadata: {
-        productId: productId,
-        productName: name,
-        size: size || "Standard",
-        quantity: String(quantity || "1"),
-      },
+      cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/`,
+      metadata: metadata,
     });
 
     return NextResponse.json({ url: session.url });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Internal Stripe Gateway Crash";
-    console.error("Stripe gateway pipeline failure:", error);
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
-    );
+    const errorMessage = error instanceof Error ? error.message : "Internal Stripe Error";
+    console.error("Stripe Checkout Error:", error);
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
