@@ -2,11 +2,9 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="684ae3c2-8600-409e-b151-d2580a6e7fdd" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/app/components/CartDrawer.tsx" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/context/CartContext.tsx" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/shop/page.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/layout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/admin/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/admin/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/context/CartContext.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/context/CartContext.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/page.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/product/[id]/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/product/[id]/page.tsx" afterDir="false" />
     </list>
@@ -114,7 +112,7 @@
       <workItem from="1784384199920" duration="3055000" />
       <workItem from="1784389061902" duration="6392000" />
       <workItem from="1784643918702" duration="3296000" />
-      <workItem from="1784813217184" duration="1704000" />
+      <workItem from="1784813217184" duration="2799000" />
     </task>
     <servers />
   </component>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 
 export interface CartItem {
   id: string;
@@ -11,7 +11,6 @@ export interface CartItem {
   quantity: number;
 }
 
-// Allow quantity to be optionally passed when adding to cart
 export type AddToCartInput = Omit<CartItem, "quantity"> & { quantity?: number };
 
 interface CartContextType {
@@ -31,11 +30,10 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
+  const isInitialRender = useRef(true);
 
-  // Load cart from localStorage after component mounts
+  // Load cart from localStorage after mount
   useEffect(() => {
-    setIsMounted(true);
     const savedCart = localStorage.getItem("sourced_cart");
     if (savedCart) {
       try {
@@ -46,12 +44,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Sync cart state to localStorage whenever it changes
+  // Save cart changes to localStorage (skips initial mount write)
   useEffect(() => {
-    if (isMounted) {
-      localStorage.setItem("sourced_cart", JSON.stringify(cart));
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      return;
     }
-  }, [cart, isMounted]);
+    localStorage.setItem("sourced_cart", JSON.stringify(cart));
+  }, [cart]);
 
   const addToCart = (newItem: AddToCartInput) => {
     const qtyToAdd = newItem.quantity && newItem.quantity > 0 ? newItem.quantity : 1;

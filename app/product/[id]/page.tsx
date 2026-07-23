@@ -318,9 +318,19 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
         </section>
       </div>
 
-      {/* Bottom Footer */}
-      <footer className="w-full border-t border-purple-950/20 bg-black/40 py-4 px-4 text-center">
-        <p className="text-[11px] text-neutral-600">© {new Date().getFullYear()} SourcedByMo. All Rights Reserved.</p>
+      {/* Stealth Footer Link */}
+      <footer className="w-full border-t border-purple-950/20 bg-black/40 py-6 px-4 text-center select-none">
+        <p className="text-[11px] text-neutral-600">
+          © {new Date().getFullYear()} SourcedByMo. All Rights Reserved.
+        </p>
+        <div className="mt-1">
+          <Link
+            href="/login"
+            className="text-[10px] text-[#050507] hover:text-neutral-700 transition-colors cursor-default"
+          >
+            Admin Panel
+          </Link>
+        </div>
       </footer>
     </main>
   );
